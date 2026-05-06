@@ -64,4 +64,37 @@ public class BrokerResponseNativeTest {
     Assert.assertEquals(newBrokerResponse.getExceptions().get(1).getErrorCode(), 400);
     Assert.assertEquals(newBrokerResponse.getExceptions().get(1).getMessage(), errorMsgStr);
   }
+
+  @Test
+  public void testQueryWarningsOmittedWhenEmpty()
+      throws IOException {
+    // A response without warnings must not include the "queryWarnings" field, preserving backward-compatible JSON.
+    BrokerResponseNative response = new BrokerResponseNative();
+    String json = response.toJsonString();
+    Assert.assertFalse(json.contains("queryWarnings"),
+        "queryWarnings field should be omitted when no warnings are present, but got: " + json);
+
+    BrokerResponseNative roundTrip = BrokerResponseNative.fromJsonString(json);
+    Assert.assertNotNull(roundTrip.getQueryWarnings());
+    Assert.assertTrue(roundTrip.getQueryWarnings().isEmpty());
+  }
+
+  @Test
+  public void testQueryWarningRoundTrip()
+      throws IOException {
+    BrokerResponseNative response = new BrokerResponseNative();
+    response.addQueryWarning(new QueryWarning(QueryWarning.TYPE_EMPTY_RESULT,
+        "Query returned 0 rows. This may be due to restrictive filters or time range."));
+
+    String json = response.toJsonString();
+    Assert.assertTrue(json.contains("\"queryWarnings\""), "queryWarnings field should appear in JSON: " + json);
+    Assert.assertTrue(json.contains("\"EMPTY_RESULT\""), "warning type should appear in JSON: " + json);
+
+    BrokerResponseNative roundTrip = BrokerResponseNative.fromJsonString(json);
+    Assert.assertEquals(roundTrip.getQueryWarnings().size(), 1);
+    QueryWarning warning = roundTrip.getQueryWarnings().get(0);
+    Assert.assertEquals(warning.getType(), QueryWarning.TYPE_EMPTY_RESULT);
+    Assert.assertEquals(warning.getMessage(),
+        "Query returned 0 rows. This may be due to restrictive filters or time range.");
+  }
 }

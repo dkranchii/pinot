@@ -43,7 +43,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * This class can be used to serialize/deserialize the broker response.
  */
 @JsonPropertyOrder({
-    "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
+    "resultTable", "numRowsResultSet", "partialResult", "exceptions", "queryWarnings", "numGroupsLimitReached",
     "numGroupsWarningLimitReached", "maxRowsInDistinctReached", "maxRowsWithoutChangeInDistinctReached",
     "maxExecutionTimeInDistinctReached", "timeUsedMs",
     "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs", "numEntriesScannedInFilter",
@@ -73,6 +73,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private ResultTable _resultTable;
   private int _numRowsResultSet = 0;
   private List<QueryProcessingException> _exceptions = new ArrayList<>();
+  private List<QueryWarning> _queryWarnings = new ArrayList<>();
   private boolean _groupsTrimmed = false;
   private boolean _numGroupsLimitReached = false;
   private boolean _numGroupsWarningLimitReached = false;
@@ -209,6 +210,24 @@ public class BrokerResponseNative implements BrokerResponse {
 
   public void addException(QueryProcessingException exception) {
     _exceptions.add(exception);
+  }
+
+  /**
+   * Returns the informational warnings attached to this response. Empty list when no warnings were emitted; the field
+   * is omitted from the JSON serialization in that case to keep responses backward compatible.
+   */
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @JsonProperty("queryWarnings")
+  public List<QueryWarning> getQueryWarnings() {
+    return _queryWarnings;
+  }
+
+  public void setQueryWarnings(List<QueryWarning> queryWarnings) {
+    _queryWarnings = queryWarnings != null ? queryWarnings : new ArrayList<>();
+  }
+
+  public void addQueryWarning(QueryWarning queryWarning) {
+    _queryWarnings.add(queryWarning);
   }
 
   @Override

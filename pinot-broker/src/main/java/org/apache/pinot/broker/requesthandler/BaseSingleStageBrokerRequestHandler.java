@@ -76,6 +76,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.response.broker.QueryWarning;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -878,6 +879,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
     brokerResponse.setTimeUsedMs(totalTimeMs);
     augmentStatistics(requestContext, brokerResponse);
+    // Attach an informational warning when the query produced no rows. This does not change query behavior; it only
+    // helps users understand empty results. Skip when:
+    //  - the query already failed (the empty result is consequential, not informative),
+    //  - the query is EXPLAIN (its result shape is a plan, not user data), or
+    //  - the caller asked to drop results (e.g. stats-only requests).
+    if (brokerResponse.getNumRowsResultSet() == 0 && brokerResponse.getExceptions().isEmpty()
+        && !pinotQuery.isExplain() && !QueryOptionsUtils.shouldDropResults(pinotQuery.getQueryOptions())) {
+      brokerResponse.addQueryWarning(new QueryWarning(QueryWarning.TYPE_EMPTY_RESULT,
+          "Query returned 0 rows. This may be due to restrictive filters or time range."));
+    }
     // include both broker side errorMsgs and server side errorMsgs
     List<QueryProcessingException> brokerExceptions = brokerResponse.getExceptions();
     brokerExceptions.stream()
